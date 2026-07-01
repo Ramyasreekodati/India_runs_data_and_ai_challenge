@@ -1,8 +1,14 @@
 # src/ranking/ranker.py
 
 class MultiLevelRanker:
-    def __init__(self, job_reqs):
+    def __init__(self, job_reqs, config=None):
         self.job = job_reqs
+        self.config = config or {
+            "tech_weight": 0.45,
+            "exp_weight": 0.25,
+            "beh_weight": 0.20,
+            "mkt_weight": 0.10
+        }
         
     def score_candidate(self, features):
         """
@@ -57,14 +63,12 @@ class MultiLevelRanker:
         mkt_score = min(1.0, (mkt_saves / 20.0) * 0.6 + (mkt_searches / 50.0) * 0.4)
         breakdown["Market_Score"] = mkt_score
         
-        # 5. Weighted Fusion
-        # Determine fusion weights based on the job requirements priority
-        # JD emphasizes: Technical Depth (Mandatory), Production Experience, and availability
+        # Determine fusion weights based on the config
         final_score = (
-            breakdown["Technical_Score"] * 0.45 +
-            breakdown["Experience_Score"] * 0.25 +
-            breakdown["Behavior_Score"] * 0.20 +
-            breakdown["Market_Score"] * 0.10
+            breakdown["Technical_Score"] * self.config.get("tech_weight", 0.45) +
+            breakdown["Experience_Score"] * self.config.get("exp_weight", 0.25) +
+            breakdown["Behavior_Score"] * self.config.get("beh_weight", 0.20) +
+            breakdown["Market_Score"] * self.config.get("mkt_weight", 0.10)
         )
         
         # Apply continuous penalties
