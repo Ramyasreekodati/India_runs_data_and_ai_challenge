@@ -28,30 +28,56 @@ config = {
 }
 
 st.sidebar.markdown("---")
-st.sidebar.header("📁 Data Input")
-st.sidebar.markdown("Upload a candidate JSONL file to run the pipeline.")
-uploaded_file = st.sidebar.file_uploader("Upload candidates.jsonl", type=["jsonl", "json"])
+st.sidebar.header("📂 Data Source")
 
-default_local_path = "../India_runs_data_and_ai_challenge/candidates.jsonl"
-if uploaded_file is not None:
-    with open("temp_upload.jsonl", "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    input_path = "temp_upload.jsonl"
-else:
-    input_path = default_local_path
+mode = st.sidebar.radio(
+    "Choose Data Source",
+    [
+        "● Demo Dataset (Recommended)", 
+        "○ Competition Dataset (100k)", 
+        "○ Upload Your Dataset", 
+        "○ Upload Candidates + JD"
+    ]
+)
+
+input_path = None
+custom_jd_config = None
+
+if mode == "● Demo Dataset (Recommended)":
+    st.sidebar.info("**Dataset**: 50 Candidates\n\n**Purpose**: Quick demonstration\n\n**Expected Runtime**: < 1 second")
+    input_path = "demo_candidates.jsonl"
+elif mode == "○ Competition Dataset (100k)":
+    st.sidebar.warning("**Dataset**: 100,000 Candidates\n\n**Expected Runtime**: 9-15 seconds\n\n*(Must run locally)*")
+    input_path = "../India_runs_data_and_ai_challenge/candidates.jsonl"
+elif mode == "○ Upload Your Dataset":
+    uploaded_file = st.sidebar.file_uploader("Upload Candidates (.json or .jsonl)", type=["jsonl", "json"])
+    if uploaded_file is not None:
+        with open("temp_upload.jsonl", "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        input_path = "temp_upload.jsonl"
+        st.sidebar.success("Dataset ready.")
+elif mode == "○ Upload Candidates + JD":
+    uploaded_cand = st.sidebar.file_uploader("1. Upload Candidates (.json or .jsonl)", type=["jsonl", "json"])
+    uploaded_jd = st.sidebar.file_uploader("2. Upload Custom JD (.json)", type=["json"])
+    if uploaded_cand is not None and uploaded_jd is not None:
+        with open("temp_upload.jsonl", "wb") as f:
+            f.write(uploaded_cand.getbuffer())
+        input_path = "temp_upload.jsonl"
+        custom_jd_config = json.loads(uploaded_jd.getvalue().decode("utf-8"))
+        st.sidebar.success("Dataset and JD ready.")
 
 if 'results' not in st.session_state:
     st.session_state.results = None
 
 if st.sidebar.button("🚀 Run Ranking Pipeline", type="primary"):
-    if not os.path.exists(input_path):
-        st.sidebar.error(f"Cannot find dataset at {input_path}")
+    if input_path is None or not os.path.exists(input_path):
+        st.sidebar.error("Data source is missing or not uploaded yet.")
     else:
         progress_bar = st.progress(0, text="Loading Pipeline...")
         time.sleep(0.5)
         
         progress_bar.progress(30, text="Streaming Candidates (Retrieval Funnel)...")
-        results = run_pipeline(input_path, "team_antigravity.csv", config)
+        results = run_pipeline(input_path, "team_antigravity.csv", config, custom_jd_config)
         
         progress_bar.progress(70, text="Executing Multi-Level Fusion Ranking...")
         time.sleep(0.5)
@@ -64,7 +90,12 @@ if st.sidebar.button("🚀 Run Ranking Pipeline", type="primary"):
         st.toast("Pipeline execution completed successfully!", icon="✅")
 
 if st.session_state.results is None:
-    st.info("👈 Click **Run Ranking Pipeline** in the sidebar to execute the pipeline and view live results.")
+    st.info("👈 Choose a **Data Source** and click **Run Ranking Pipeline** to execute the pipeline.")
+    st.markdown("""
+    ### 🚀 Quick Start
+    Don't have a dataset? 
+    Select **Demo Dataset (Recommended)** on the left and run the pipeline instantly to explore the system!
+    """)
 else:
     results = st.session_state.results
     

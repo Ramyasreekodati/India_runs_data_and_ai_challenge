@@ -1,15 +1,14 @@
 # src/retrieval/pipeline.py
-import json
 import heapq
 import time
 from src.candidate_engine.parser import parse_candidate
-from src.job_engine.parser import JobRequirements
 from src.feature_engineering.extractor import FeatureExtractor
+from src.app.loaders import CandidateLoader
 
 class RetrievalPipeline:
-    def __init__(self, top_k=3000):
+    def __init__(self, job_reqs, top_k=3000):
         self.top_k = top_k
-        self.job_reqs = JobRequirements()
+        self.job_reqs = job_reqs
         self.extractor = FeatureExtractor(self.job_reqs)
         
     def retrieve(self, jsonl_path):
@@ -22,45 +21,19 @@ class RetrievalPipeline:
         start_time = time.time()
         processed = 0
         
-        with open(jsonl_path, "r", encoding="utf-8") as f:
-            first_char = ""
-            for line in f:
-                line = line.strip()
-                if line:
-                    first_char = line[0]
-                    break
+        loader = CandidateLoader(jsonl_path)
+        
+        for raw in loader.stream():
+            processed += 1
+            cand = parse_candidate(raw)
+            features = self.extractor.extract(cand)
+            score = self.extractor.compute_heuristic_score(features)
             
-            f.seek(0)
-            
-            if first_char == '[':
-                # It's a standard JSON array
-                data = json.load(f)
-                for raw in data:
-                    processed += 1
-                    cand = parse_candidate(raw)
-                    features = self.extractor.extract(cand)
-                    score = self.extractor.compute_heuristic_score(features)
-                    
-                    if len(top_candidates) < self.top_k:
-                        heapq.heappush(top_candidates, (score, cand.id, raw, features))
-                    elif score > top_candidates[0][0]:
-                        heapq.heapreplace(top_candidates, (score, cand.id, raw, features))
-            else:
-                # It's a JSONL file
-                for line in f:
-                    if not line.strip(): continue
-                    processed += 1
-                    
-                    raw = json.loads(line)
-                    cand = parse_candidate(raw)
-                    features = self.extractor.extract(cand)
-                    score = self.extractor.compute_heuristic_score(features)
-                    
-                    # Only push to heap if we don't have top_k yet, or if score is better than the worst in our top_k
-                    if len(top_candidates) < self.top_k:
-                        heapq.heappush(top_candidates, (score, cand.id, raw, features))
-                    elif score > top_candidates[0][0]:
-                        heapq.heapreplace(top_candidates, (score, cand.id, raw, features))
+            # Only push to heap if we don't have top_k yet, or if score is better than the worst in our top_k
+            if len(top_candidates) < self.top_k:
+                heapq.heappush(top_candidates, (score, cand.id, raw, features))
+            elif score > top_candidates[0][0]:
+                heapq.heapreplace(top_candidates, (score, cand.id, raw, features))
                     
         elapsed = time.time() - start_time
         print(f"Retrieval Pipeline: Processed {processed} candidates in {elapsed:.2f}s. Kept top {len(top_candidates)}.")

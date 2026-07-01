@@ -12,12 +12,12 @@ from src.app.contracts import (
     PipelineResults, JobAnalysis, DatasetProfile, 
     RetrievalResults, FeatureSummary, EvaluationResults
 )
-from src.job_engine.parser import JobRequirements
+from src.app.loaders import JobLoader
 from src.retrieval.pipeline import RetrievalPipeline
 from src.ranking.ranker import MultiLevelRanker
 from src.reasoning.generator import ReasonGenerator
 
-def run_pipeline(jsonl_path, output_csv_path, config=None, team_id="team_ranker"):
+def run_pipeline(jsonl_path, output_csv_path, config=None, custom_jd_config=None, team_id="team_ranker"):
     """
     Executes the entire pipeline and returns a strongly-typed PipelineResults contract.
     """
@@ -25,7 +25,7 @@ def run_pipeline(jsonl_path, output_csv_path, config=None, team_id="team_ranker"
     start_time = time.time()
     
     # 1. Job Requirements
-    job = JobRequirements()
+    job = JobLoader.load_requirements(custom_jd_config)
     job_analysis = JobAnalysis(
         mandatory_skills_count=len(job.mandatory_skills),
         preferred_skills_count=len(job.preferred_skills),
@@ -33,7 +33,7 @@ def run_pipeline(jsonl_path, output_csv_path, config=None, team_id="team_ranker"
     )
     
     # 2. Retrieval (Top 3000 via heuristic heap)
-    retriever = RetrievalPipeline(top_k=3000)
+    retriever = RetrievalPipeline(job_reqs=job, top_k=3000)
     top_candidates = retriever.retrieve(jsonl_path)
     
     dataset_analysis = DatasetProfile(
