@@ -99,7 +99,7 @@ if st.session_state.results is None:
 else:
     results = st.session_state.results
     
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Requirements", "Dataset", "Features", "Ranking", "Evaluation", "Results (Decision Explorer)"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Requirements", "Dataset", "Features", "Ranking", "Evaluation", "Decision Explorer", "Compare Candidates"])
     
     with tab1:
         st.header("Job Analysis")
@@ -187,3 +187,56 @@ else:
             mime="text/csv",
             type="primary"
         )
+        
+    with tab7:
+        st.header("Candidate Comparison")
+        st.markdown("Select two candidates to compare their raw scores and see why one outranked the other.")
+        
+        df = results.top_candidates
+        candidate_list = df["candidate_id"].tolist()
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            cand_a_id = st.selectbox("Select Candidate A", candidate_list, index=0)
+        with c2:
+            cand_b_id = st.selectbox("Select Candidate B", candidate_list, index=1 if len(candidate_list) > 1 else 0)
+            
+        cand_a = df[df["candidate_id"] == cand_a_id].iloc[0]
+        cand_b = df[df["candidate_id"] == cand_b_id].iloc[0]
+        
+        a_breakdown = cand_a["raw_breakdown"]
+        b_breakdown = cand_b["raw_breakdown"]
+        
+        # Calculate Deltas (A - B)
+        # If A > B, A is better, so the delta shown on A's side is positive.
+        # Streamlit metrics naturally show positive as green.
+        
+        st.markdown("### Head-to-Head Attributes")
+        
+        # We will render columns for A and B side-by-side
+        colA, colB = st.columns(2)
+        
+        with colA:
+            st.subheader(f"🏆 Candidate A: {cand_a_id}")
+            st.markdown(f"**Overall Rank**: {cand_a['rank']} (Score: {cand_a['score']:.4f})")
+            st.metric("Technical Score", f"{a_breakdown.get('Technical_Score', 0):.2f}", delta=f"{(a_breakdown.get('Technical_Score', 0) - b_breakdown.get('Technical_Score', 0)):.2f}")
+            st.metric("Experience Score", f"{a_breakdown.get('Experience_Score', 0):.2f}", delta=f"{(a_breakdown.get('Experience_Score', 0) - b_breakdown.get('Experience_Score', 0)):.2f}")
+            st.metric("Behavior Score", f"{a_breakdown.get('Behavior_Score', 0):.2f}", delta=f"{(a_breakdown.get('Behavior_Score', 0) - b_breakdown.get('Behavior_Score', 0)):.2f}")
+            st.metric("Market Score", f"{a_breakdown.get('Market_Score', 0):.2f}", delta=f"{(a_breakdown.get('Market_Score', 0) - b_breakdown.get('Market_Score', 0)):.2f}")
+            
+        with colB:
+            st.subheader(f"🏆 Candidate B: {cand_b_id}")
+            st.markdown(f"**Overall Rank**: {cand_b['rank']} (Score: {cand_b['score']:.4f})")
+            st.metric("Technical Score", f"{b_breakdown.get('Technical_Score', 0):.2f}", delta=f"{(b_breakdown.get('Technical_Score', 0) - a_breakdown.get('Technical_Score', 0)):.2f}")
+            st.metric("Experience Score", f"{b_breakdown.get('Experience_Score', 0):.2f}", delta=f"{(b_breakdown.get('Experience_Score', 0) - a_breakdown.get('Experience_Score', 0)):.2f}")
+            st.metric("Behavior Score", f"{b_breakdown.get('Behavior_Score', 0):.2f}", delta=f"{(b_breakdown.get('Behavior_Score', 0) - a_breakdown.get('Behavior_Score', 0)):.2f}")
+            st.metric("Market Score", f"{b_breakdown.get('Market_Score', 0):.2f}", delta=f"{(b_breakdown.get('Market_Score', 0) - a_breakdown.get('Market_Score', 0)):.2f}")
+            
+        st.markdown("---")
+        st.subheader("Verdict Summary")
+        if cand_a['score'] > cand_b['score']:
+            st.success(f"**{cand_a_id}** is ranked higher. While both candidates may have strengths, Candidate A achieved a total weighted score of {cand_a['score']:.4f} compared to {cand_b_id}'s {cand_b['score']:.4f}.")
+        elif cand_b['score'] > cand_a['score']:
+            st.success(f"**{cand_b_id}** is ranked higher. While both candidates may have strengths, Candidate B achieved a total weighted score of {cand_b['score']:.4f} compared to {cand_a_id}'s {cand_a['score']:.4f}.")
+        else:
+            st.info("Both candidates achieved the exact same weighted score.")
