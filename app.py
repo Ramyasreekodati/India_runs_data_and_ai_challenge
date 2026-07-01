@@ -33,7 +33,19 @@ config = {
     "mkt_weight": mkt_weight
 }
 
-input_path = st.sidebar.text_input("Dataset Path", "../India_runs_data_and_ai_challenge/candidates.jsonl")
+st.sidebar.markdown("---")
+st.sidebar.header("📁 Data Input")
+st.sidebar.markdown("Upload a candidate JSONL file to run the pipeline.")
+uploaded_file = st.sidebar.file_uploader("Upload candidates.jsonl", type=["jsonl", "json"])
+
+default_local_path = "../India_runs_data_and_ai_challenge/candidates.jsonl"
+if uploaded_file is not None:
+    # Save to a temporary file
+    with open("temp_upload.jsonl", "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    input_path = "temp_upload.jsonl"
+else:
+    input_path = default_local_path
 
 if 'pipeline_run' not in st.session_state:
     st.session_state.pipeline_run = False
