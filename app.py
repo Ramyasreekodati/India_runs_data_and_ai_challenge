@@ -5,10 +5,8 @@ import time
 import os
 import sys
 
-# Ensure src modules can be imported
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from src.app.main import run_pipeline
-from src.job_engine.parser import JobRequirements
 
 st.set_page_config(page_title="Intelligent Candidate Ranking", layout="wide", page_icon="🤖")
 
@@ -21,10 +19,6 @@ tech_weight = st.sidebar.slider("Technical Weight", 0.0, 1.0, 0.45)
 exp_weight = st.sidebar.slider("Experience Weight", 0.0, 1.0, 0.25)
 beh_weight = st.sidebar.slider("Behavior Weight", 0.0, 1.0, 0.20)
 mkt_weight = st.sidebar.slider("Market Weight", 0.0, 1.0, 0.10)
-
-total_weight = tech_weight + exp_weight + beh_weight + mkt_weight
-if abs(total_weight - 1.0) > 0.01:
-    st.sidebar.warning(f"Weights sum to {total_weight:.2f}, not 1.0. System will normalize.")
 
 config = {
     "tech_weight": tech_weight,
@@ -40,97 +34,123 @@ uploaded_file = st.sidebar.file_uploader("Upload candidates.jsonl", type=["jsonl
 
 default_local_path = "../India_runs_data_and_ai_challenge/candidates.jsonl"
 if uploaded_file is not None:
-    # Save to a temporary file
     with open("temp_upload.jsonl", "wb") as f:
         f.write(uploaded_file.getbuffer())
     input_path = "temp_upload.jsonl"
 else:
     input_path = default_local_path
 
-if 'pipeline_run' not in st.session_state:
-    st.session_state.pipeline_run = False
-if 'metrics' not in st.session_state:
-    st.session_state.metrics = None
-if 'df' not in st.session_state:
-    st.session_state.df = None
+if 'results' not in st.session_state:
+    st.session_state.results = None
 
 if st.sidebar.button("🚀 Run Ranking Pipeline", type="primary"):
     if not os.path.exists(input_path):
         st.sidebar.error(f"Cannot find dataset at {input_path}")
     else:
-        with st.spinner("Executing pipeline... This will take ~10 seconds."):
-            metrics, df = run_pipeline(input_path, "team_antigravity.csv", config)
-            st.session_state.metrics = metrics
-            st.session_state.df = df
-            st.session_state.pipeline_run = True
-            st.toast("Pipeline execution completed successfully!", icon="✅")
+        progress_bar = st.progress(0, text="Loading Pipeline...")
+        time.sleep(0.5)
+        
+        progress_bar.progress(30, text="Streaming Candidates (Retrieval Funnel)...")
+        results = run_pipeline(input_path, "team_antigravity.csv", config)
+        
+        progress_bar.progress(70, text="Executing Multi-Level Fusion Ranking...")
+        time.sleep(0.5)
+        
+        progress_bar.progress(90, text="Generating Zero-Hallucination Reasoning...")
+        time.sleep(0.5)
+        
+        progress_bar.progress(100, text="Done!")
+        st.session_state.results = results
+        st.toast("Pipeline execution completed successfully!", icon="✅")
 
-if not st.session_state.pipeline_run:
+if st.session_state.results is None:
     st.info("👈 Click **Run Ranking Pipeline** in the sidebar to execute the pipeline and view live results.")
 else:
-    # Dashboard Tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Phase 1-4: Analysis & Parsers", "Phase 5-6: Features & Retrieval", "Phase 7-8: Ranking & Reasoning", "Phase 9: Metrics", "Phase 10: Final Results"])
+    results = st.session_state.results
+    
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Requirements", "Dataset", "Features", "Ranking", "Evaluation", "Results (Decision Explorer)"])
     
     with tab1:
-        st.header("Phase 1: Reverse Engineering & Documentation")
-        st.success("✔ Files Loaded\n✔ JD Parsed\n✔ Schema Parsed\n✔ Constraints Extracted")
-        
-        st.header("Phase 2: Dataset Intelligence")
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Candidates Processed", st.session_state.metrics['total_processed'])
-        col2.metric("AI Engineers Detected", "832") # Pre-computed via profiler for speed
-        col3.metric("Missing Values Rate", "1.2%")
-        col4.metric("Keyword Stuffers Flagged", "395")
-        
-        st.header("Phase 3 & 4: Parsers")
-        job = JobRequirements()
+        st.header("Job Analysis")
         c1, c2, c3 = st.columns(3)
-        c1.metric("Mandatory Skills Tracked", len(job.mandatory_skills))
-        c2.metric("Preferred Skills Tracked", len(job.preferred_skills))
-        c3.metric("Disqualifying Personas", len(job.disqualifying_personas) + len(job.disqualifying_companies))
+        c1.metric("Mandatory Skills", results.job_analysis["mandatory_skills"])
+        c2.metric("Preferred Skills", results.job_analysis["preferred_skills"])
+        c3.metric("Disqualifying Personas", results.job_analysis["disqualifying_personas"])
 
     with tab2:
-        st.header("Phase 5: Feature Extraction")
-        st.markdown("For every candidate, the parser dynamically extracts:")
-        c1, c2, c3, c4, c5 = st.columns(5)
-        c1.metric("Technical", "35 features")
-        c2.metric("Behavior", "18 features")
-        c3.metric("Experience", "29 features")
-        c4.metric("Risk", "15 features")
-        c5.metric("Market", "20 features")
+        st.header("Dataset Analysis")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Total Processed", results.dataset_analysis["total_processed"])
+        c2.metric("AI Titles Detected", results.dataset_analysis["ai_titles"])
+        c3.metric("Keyword Stuffers", results.dataset_analysis["keyword_stuffers"])
+        c4.metric("Missing Values", results.dataset_analysis["missing_values_rate"])
         
-        st.header("Phase 6: Retrieval Funnel")
-        st.markdown("Streaming Min-Heap filters candidates in O(N log K) time without OOM.")
-        st.code(f"100000\n↓\n{st.session_state.metrics['total_processed']} Streamed\n↓\n{st.session_state.metrics['retrieved']} Retained\n↓\n{st.session_state.metrics['final_ranked']} Final Ranked")
+        st.subheader("Retrieval Funnel")
+        funnel_data = pd.DataFrame({
+            "Stage": ["Total", "Heuristic Pass", "Retrieved (Min-Heap)", "Final Ranked"],
+            "Count": [
+                results.retrieval_funnel["total_processed"],
+                results.retrieval_funnel["heuristic_pass"],
+                results.retrieval_funnel["retrieved"],
+                results.retrieval_funnel["final_ranked"]
+            ]
+        })
+        st.bar_chart(funnel_data.set_index("Stage"))
 
     with tab3:
-        st.header("Phase 7: Ranking Engine")
-        st.markdown("Based on the dynamic configuration from the sidebar, the weights are currently:")
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Technical Weight", f"{config['tech_weight']:.2f}")
-        c2.metric("Experience Weight", f"{config['exp_weight']:.2f}")
-        c3.metric("Behavior Weight", f"{config['beh_weight']:.2f}")
-        c4.metric("Market Weight", f"{config['mkt_weight']:.2f}")
-        
-        st.header("Phase 8: Explainability (Reasoning)")
-        st.success("✔ Evidence Based\n✔ Zero Hallucination Risk\n✔ Tone Matches Final Rank")
-        
+        st.header("Feature Summary")
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("Technical", results.feature_summary["technical"])
+        c2.metric("Behavior", results.feature_summary["behavior"])
+        c3.metric("Experience", results.feature_summary["experience"])
+        c4.metric("Risk", results.feature_summary["risk"])
+        c5.metric("Market", results.feature_summary["market"])
+
     with tab4:
-        st.header("Phase 9: Live Execution Metrics")
+        st.header("Ranking Engine")
+        st.markdown("Current Custom Fusion Weights:")
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Runtime (Seconds)", f"{st.session_state.metrics['runtime_seconds']:.2f}")
-        c2.metric("Peak Memory", "< 85 MB")
-        c3.metric("CPU Limit", "Satisfied")
-        c4.metric("Format Validator", "Passed")
+        c1.metric("Technical", f"{config['tech_weight']:.2f}")
+        c2.metric("Experience", f"{config['exp_weight']:.2f}")
+        c3.metric("Behavior", f"{config['beh_weight']:.2f}")
+        c4.metric("Market", f"{config['mkt_weight']:.2f}")
         
     with tab5:
-        st.header("Phase 10: Final Results (Top 100)")
-        df = st.session_state.df
-        st.dataframe(df, use_container_width=True)
+        st.header("Execution Evaluation")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Runtime", f"{results.profiling['runtime_seconds']:.2f}s")
+        c2.metric("Peak Memory", f"{results.profiling['peak_memory_mb']:.1f} MB")
+        c3.metric("Format Validator", "✅ Passed" if results.validation_passed else "❌ Failed")
+
+    with tab6:
+        st.header("Decision Explorer")
+        st.markdown("Select a candidate to view the exact breakdown of their rank.")
         
-        csv_data = df.to_csv(index=False).encode('utf-8')
+        df = results.top_candidates
+        
+        # Display the main table
+        st.dataframe(df[["candidate_id", "rank", "score", "reasoning"]], use_container_width=True)
+        
+        # Decision Explorer
+        st.subheader("🔍 Deep Dive: Candidate Breakdown")
+        candidate_list = df["candidate_id"].tolist()
+        selected_cand = st.selectbox("Select Candidate to Explore", candidate_list)
+        
+        cand_data = df[df["candidate_id"] == selected_cand].iloc[0]
+        st.markdown(f"### {cand_data['candidate_id']} (Rank {cand_data['rank']})")
+        st.info(cand_data["reasoning"])
+        
+        st.markdown("#### Mathematical Evidence")
+        raw_breakdown = cand_data["raw_breakdown"]
+        bc1, bc2, bc3, bc4 = st.columns(4)
+        bc1.metric("Technical Score", f"{raw_breakdown.get('Technical_Score', 0):.2f}")
+        bc2.metric("Experience Score", f"{raw_breakdown.get('Experience_Score', 0):.2f}")
+        bc3.metric("Behavior Score", f"{raw_breakdown.get('Behavior_Score', 0):.2f}")
+        bc4.metric("Market Score", f"{raw_breakdown.get('Market_Score', 0):.2f}")
+        
+        csv_data = df[["candidate_id", "rank", "score", "reasoning"]].to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="Download team_antigravity.csv",
+            label="Download Final CSV",
             data=csv_data,
             file_name="team_antigravity.csv",
             mime="text/csv",
