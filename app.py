@@ -73,26 +73,26 @@ else:
     with tab1:
         st.header("Job Analysis")
         c1, c2, c3 = st.columns(3)
-        c1.metric("Mandatory Skills", results.job_analysis["mandatory_skills"])
-        c2.metric("Preferred Skills", results.job_analysis["preferred_skills"])
-        c3.metric("Disqualifying Personas", results.job_analysis["disqualifying_personas"])
+        c1.metric("Mandatory Skills", results.job_analysis.mandatory_skills_count)
+        c2.metric("Preferred Skills", results.job_analysis.preferred_skills_count)
+        c3.metric("Disqualifying Personas", results.job_analysis.disqualifying_personas_count)
 
     with tab2:
         st.header("Dataset Analysis")
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Total Processed", results.dataset_analysis["total_processed"])
-        c2.metric("AI Titles Detected", results.dataset_analysis["ai_titles"])
-        c3.metric("Keyword Stuffers", results.dataset_analysis["keyword_stuffers"])
-        c4.metric("Missing Values", results.dataset_analysis["missing_values_rate"])
+        c1.metric("Total Processed", results.dataset_analysis.total_processed)
+        c2.metric("AI Titles Detected", results.dataset_analysis.ai_titles_detected)
+        c3.metric("Keyword Stuffers", results.dataset_analysis.keyword_stuffers_flagged)
+        c4.metric("Missing Values", results.dataset_analysis.missing_values_rate)
         
         st.subheader("Retrieval Funnel")
         funnel_data = pd.DataFrame({
             "Stage": ["Total", "Heuristic Pass", "Retrieved (Min-Heap)", "Final Ranked"],
             "Count": [
-                results.retrieval_funnel["total_processed"],
-                results.retrieval_funnel["heuristic_pass"],
-                results.retrieval_funnel["retrieved"],
-                results.retrieval_funnel["final_ranked"]
+                results.retrieval_funnel.total_processed,
+                results.retrieval_funnel.heuristic_pass,
+                results.retrieval_funnel.retrieved_top_k,
+                results.retrieval_funnel.final_ranked
             ]
         })
         st.bar_chart(funnel_data.set_index("Stage"))
@@ -100,11 +100,11 @@ else:
     with tab3:
         st.header("Feature Summary")
         c1, c2, c3, c4, c5 = st.columns(5)
-        c1.metric("Technical", results.feature_summary["technical"])
-        c2.metric("Behavior", results.feature_summary["behavior"])
-        c3.metric("Experience", results.feature_summary["experience"])
-        c4.metric("Risk", results.feature_summary["risk"])
-        c5.metric("Market", results.feature_summary["market"])
+        c1.metric("Technical", results.feature_summary.technical)
+        c2.metric("Behavior", results.feature_summary.behavior)
+        c3.metric("Experience", results.feature_summary.experience)
+        c4.metric("Risk", results.feature_summary.risk)
+        c5.metric("Market", results.feature_summary.market)
 
     with tab4:
         st.header("Ranking Engine")
@@ -118,9 +118,9 @@ else:
     with tab5:
         st.header("Execution Evaluation")
         c1, c2, c3 = st.columns(3)
-        c1.metric("Runtime", f"{results.profiling['runtime_seconds']:.2f}s")
-        c2.metric("Peak Memory", f"{results.profiling['peak_memory_mb']:.1f} MB")
-        c3.metric("Format Validator", "✅ Passed" if results.validation_passed else "❌ Failed")
+        c1.metric("Runtime", f"{results.profiling.runtime_seconds:.2f}s")
+        c2.metric("Peak Memory", f"{results.profiling.peak_memory_mb:.1f} MB")
+        c3.metric("Format Validator", "✅ Passed" if results.profiling.validator_passed else "❌ Failed")
 
     with tab6:
         st.header("Decision Explorer")
