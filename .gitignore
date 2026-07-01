@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+venv/
+candidates.jsonl
+*.gz
+team_antigravity.csv
